@@ -4,6 +4,10 @@ Convert Minecraft structures to Counter-Strike 2 `.vmap` maps.
 
 MCtoCS reads `.nbt` files exported from Minecraft and generates fully textured CS2 maps you can open in Hammer and compile.
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/9e7682df-647a-4236-ab65-b66292a186d6" /><img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/710d40ef-eb2d-4d76-91a4-ca9bb2ef008f" />
+
+
+
 ---
 
 ## Features
@@ -53,7 +57,7 @@ Output: `dist/MCtoCS.exe`
 
 ### 1. Select Input File
 
-Click **Browse** and select your Minecraft structure file (`.nbt`, `.schematic`, or `.schem`).
+Click **Browse** and select your Minecraft structure file (`.nbt`).
 
 > **Tip:** For structures with **more than 5,000 blocks**, use the **"Merge Same Touching"** output mode. Per Block mode creates a separate mesh per block which can be very slow for large builds.
 
@@ -112,10 +116,14 @@ Click **Convert** and the `.vmap` file will be saved alongside your input file. 
 Click **Recompile Textures** to re-export and compile textures without re-converting the map.
 
 ---
+## Special thanks
 
+- Thanks to [krays](https://steamcommunity.com/id/varvar2003/) for helping me while creation of this project
+
+---
 ## Tips
 
-- **Export your builds** from Minecraft using Structure Blocks (`.nbt`) or WorldEdit (`.schematic` / `.schem`).
+- **Export your builds** from Minecraft using Structure Blocks (`.nbt`) .
 - **Large builds:** Always use "Merge Same Touching" or "Per Block Type" mode. Per Block mode on 10k+ block structures will produce huge files.
 - **RTX packs** significantly improve visual quality in CS2 — normal maps add surface detail and MER textures give proper metallic/roughness values.
 - **Stair clip ramps** make stairs walkable like real ramps in CS2 instead of requiring jumping.
