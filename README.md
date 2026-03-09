@@ -134,5 +134,5 @@ Click **Recompile Textures** to re-export and compile textures without re-conver
 ## Todo
 
 - **Auto-particle for ingame objects
-  
+- **Surface properties for materials
 ---
