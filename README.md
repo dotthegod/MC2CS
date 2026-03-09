@@ -20,7 +20,7 @@ MCtoCS reads `.nbt` files exported from Minecraft and generates fully textured C
 - **Liquids as func_water** — optionally convert water/lava to CS2 water entities
 - **Damage blocks** — cactus, magma, etc. can generate `trigger_hurt` entities
 - **Climbable ladders** — ladders generate `func_ladder` entities
-- **Slime bounce** — slime blocks generate bounce trigger brushes
+- **Slime bounce** — slime blocks generate bounce trigger brushes (Still W.I.P.)
 - **Stair/slab clip ramps** — auto-generates invisible ramp brushes so players can walk up stairs and slabs smoothly
 - **Auto-lighting** — light-emitting blocks (glowstone, torches, sea lanterns) automatically place `light_omni` entities
 - **Multiple output modes** — Per Block, Merge Same Touching, Per Block Type, or Single Mesh
