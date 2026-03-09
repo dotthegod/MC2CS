@@ -16,7 +16,7 @@ MCtoCS reads `.nbt` files exported from Minecraft and generates fully textured C
 - **PBR support** — Bedrock RTX packs with normal/MER textures generate proper PBR materials in CS2
 - **Model blocks** — fences, torches, stairs, flowers, and other non-cube blocks render with correct geometry when MC assets are provided
 - **Face culling** — hidden faces between adjacent solid blocks are removed for performance
-- **Animated textures** — water, lava, fire, and other animated textures are exported as sprite sheet animations
+- **Animated textures** — water, lava, fire, and other animated textures are exported as sprite sheet animations (Still W.I.P.)
 - **Liquids as func_water** — optionally convert water/lava to CS2 water entities
 - **Damage blocks** — cactus, magma, etc. can generate `trigger_hurt` entities
 - **Climbable ladders** — ladders generate `func_ladder` entities
