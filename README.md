@@ -122,3 +122,9 @@ Click **Recompile Textures** to re-export and compile textures without re-conver
 - **Auto-lighting** saves you from manually placing lights — glowstone, sea lanterns, torches etc. all emit light automatically.
 
 ---
+
+## Todo
+
+- **Auto-particle for ingame objects
+  
+---
