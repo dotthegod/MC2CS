@@ -9,7 +9,8 @@ from config.blocks import (should_generate_geometry, is_solid_for_culling,
                            is_waterlogged, is_damage_block,
                            is_climbable_block, is_slime_block,
                            is_leaf_block, is_stair_block, is_half_height_block,
-                           is_light_source, get_light_properties)
+                           is_light_source, get_light_properties,
+                           is_barrier_block)
 
 
 def _parse_block_state(block_name: str) -> dict:
@@ -26,7 +27,7 @@ def _parse_block_state(block_name: str) -> dict:
 
 
 def _generate_ramp_quads(bx, by, bz, facing, block, scale, offset, block_pos,
-                         y_base=0.5, y_top=0.75, bridge=False):
+                         y_base=0.5, y_top=1.0, bridge=False):
     """Generate a ramp (wedge) clip brush for a stair block gap.
 
     Creates a distorted hexahedron where one edge is collapsed to near-zero
@@ -40,19 +41,18 @@ def _generate_ramp_quads(bx, by, bz, facing, block, scale, offset, block_pos,
             step), with slope rising toward the facing direction.  Used for
             inter-stair transition ramps.
     """
-    EPS = 1.0 / 128  # thin-edge epsilon to avoid degenerate faces
+    EPS = 1.0 / 32  # thin-edge epsilon to avoid degenerate faces
     ox, oy, oz = offset
 
     yb = y_base
     yt = y_top
 
     if not bridge:
-        # Normal ramp: covers the BACK half (gap side) of the stair.
-        # Tall side at the step edge, thin side at the approach.
+        # Normal ramp: covers the FULL block, sloping from approach (thin) to step edge (tall).
         if facing == "north":
             verts = [
-                (0, yb, 0.5), (1, yb, 0.5),
-                (0, yt, 0.5), (1, yt, 0.5),
+                (0, yb, 0.0), (1, yb, 0.0),
+                (0, yt, 0.0), (1, yt, 0.0),
                 (0, yb, 1.0), (1, yb, 1.0),
                 (0, yb + EPS, 1.0), (1, yb + EPS, 1.0),
             ]
@@ -60,20 +60,20 @@ def _generate_ramp_quads(bx, by, bz, facing, block, scale, offset, block_pos,
             verts = [
                 (0, yb, 0.0), (1, yb, 0.0),
                 (0, yb + EPS, 0.0), (1, yb + EPS, 0.0),
-                (0, yb, 0.5), (1, yb, 0.5),
-                (0, yt, 0.5), (1, yt, 0.5),
+                (0, yb, 1.0), (1, yb, 1.0),
+                (0, yt, 1.0), (1, yt, 1.0),
             ]
         elif facing == "east":
             verts = [
                 (0.0, yb, 0), (0.0, yb, 1),
                 (0.0, yb + EPS, 0), (0.0, yb + EPS, 1),
-                (0.5, yb, 0), (0.5, yb, 1),
-                (0.5, yt, 0), (0.5, yt, 1),
+                (1.0, yb, 0), (1.0, yb, 1),
+                (1.0, yt, 0), (1.0, yt, 1),
             ]
         elif facing == "west":
             verts = [
-                (0.5, yb, 0), (0.5, yb, 1),
-                (0.5, yt, 0), (0.5, yt, 1),
+                (0.0, yb, 0), (0.0, yb, 1),
+                (0.0, yt, 0), (0.0, yt, 1),
                 (1.0, yb, 0), (1.0, yb, 1),
                 (1.0, yb + EPS, 0), (1.0, yb + EPS, 1),
             ]
@@ -288,6 +288,7 @@ def generate_quads(grid: BlockGrid, scale: float = 64.0,
     leaf_lut = np.zeros(max_idx, dtype=bool)
     stair_lut = np.zeros(max_idx, dtype=bool)
     half_height_lut = np.zeros(max_idx, dtype=bool)
+    barrier_lut = np.zeros(max_idx, dtype=bool)
     for idx, name in palette.items():
         if idx < max_idx:
             geo_lut[idx] = should_generate_geometry(name)
@@ -303,6 +304,7 @@ def generate_quads(grid: BlockGrid, scale: float = 64.0,
             leaf_lut[idx] = is_leaf_block(name)
             stair_lut[idx] = is_stair_block(name)
             half_height_lut[idx] = is_half_height_block(name)
+            barrier_lut[idx] = is_barrier_block(name)
 
     light_lut = np.zeros(max_idx, dtype=bool)
     if generate_lights:
@@ -321,6 +323,7 @@ def generate_quads(grid: BlockGrid, scale: float = 64.0,
     leaf_mask = leaf_lut[blocks]
     stair_mask = stair_lut[blocks]
     half_height_mask = half_height_lut[blocks]
+    barrier_mask = barrier_lut[blocks]
     liquid_mask = water_mask | lava_mask
 
     if separate_liquids:
@@ -731,6 +734,18 @@ def generate_quads(grid: BlockGrid, scale: float = 64.0,
                                         (nx2, ny2, nz2),
                                         y_base=0, y_top=slab_height * 0.5,
                                         bridge=True))
+
+    # --- Barrier blocks: invisible full-cube clip brushes ---
+    if np.any(barrier_mask):
+        barrier_positions = np.argwhere(barrier_mask)
+        for i in range(len(barrier_positions)):
+            bx, by, bz = barrier_positions[i]
+            block = palette[int(blocks[bx, by, bz])]
+            bp = (int(bx), int(by), int(bz))
+            stair_clip_quads.extend(
+                _generate_box_quads(int(bx), int(by), int(bz),
+                                   0, 0, 0, 1, 1, 1,
+                                   block, scale, offset, bp))
 
     # --- Second pass: model blocks ---
     if model_generator is not None:

@@ -1,0 +1,14 @@
+[package]
+name = "mctocs_rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mctocs_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+uuid = { version = "1", features = ["v4"] }
+rand = "0.8"
+rustc-hash = "2"

@@ -219,9 +219,13 @@ def build_halfedge_mesh(quads: list[Quad]) -> HalfEdgeMesh:
     # ------------------------------------------------------------------
     # Gather outgoing HE indices per vertex (FROM vertex)
     _vert_out = defaultdict(set)
+    # Also build reverse index: vertex -> list of HEs pointing TO it.
+    # This avoids an O(V_nonmanifold * E) scan when updating to-vertices.
+    _vert_in = defaultdict(list)
     for he in range(num_he):
         from_v = out_to[out_opp[he]]
         _vert_out[from_v].add(he)
+        _vert_in[out_to[he]].append(he)
 
     for v in list(_vert_out.keys()):
         out_hes = _vert_out[v]
@@ -284,13 +288,11 @@ def build_halfedge_mesh(quads: list[Quad]) -> HalfEdgeMesh:
             vertices.append(vertices[v])
             new_vertex_ids.append(new_idx)
 
-        # Update every HE that points TO v: set to the correct copy
-        for he in range(num_he):
-            if out_to[he] == v:
-                # opp(he) is outgoing from v; determine its group
-                outgoing = out_opp[he]
-                gi = he_group.get(outgoing, 0)
-                out_to[he] = new_vertex_ids[gi]
+        # Update HEs that point TO v using the prebuilt reverse index
+        for he in _vert_in[v]:
+            outgoing = out_opp[he]
+            gi = he_group.get(outgoing, 0)
+            out_to[he] = new_vertex_ids[gi]
 
     num_verts = len(vertices)
     # ------------------------------------------------------------------
@@ -450,19 +452,16 @@ def compute_face_tangent(normal: tuple) -> tuple:
 
 def compute_texture_axes(normal: tuple) -> tuple:
     """Compute textureAxisU and textureAxisV for a face.
-    Returns (axisU, axisV) where each is (x, y, z, bias).
-    Bias is typically 256 for standard mapping.
+    Returns (axisU, axisV) where each is (x, y, z, offset).
     """
     nx, ny, nz = normal
     anx, any_, anz = abs(nx), abs(ny), abs(nz)
-    bias = 256.0
-
     if anz >= anx and anz >= any_:
         # Top/bottom: U=X, V=Y (Y negated in CS2, so V=Y gives correct orientation)
-        return (1, 0, 0, bias), (0, 1, 0, bias)
+        return (1, 0, 0, 0), (0, 1, 0, 0)
     elif any_ >= anx:
         # Front/back: U=X, V=-Z (V increases downward = correct texture orientation)
-        return (1, 0, 0, bias), (0, 0, -1, bias)
+        return (1, 0, 0, 0), (0, 0, -1, 0)
     else:
         # Left/right: U=-Y, V=-Z (Y negated in CS2)
-        return (0, -1, 0, bias), (0, 0, -1, bias)
+        return (0, -1, 0, 0), (0, 0, -1, 0)

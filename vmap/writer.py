@@ -40,15 +40,18 @@ def _fmt_vec4(v) -> str:
 class VMapWriter:
     """Writes .vmap files in KeyValues2 DMX format."""
 
-    def __init__(self):
+    def __init__(self, max_indent: int = 0):
         self.lines = []
         self.indent = 0
+        self.max_indent = max_indent  # 0 = unlimited (full indentation)
         self._array_items = []  # buffer for current array items
         self._in_array = False
+        self._array_dtype = ""
 
     def _w(self, text: str = ""):
         if text:
-            self.lines.append("\t" * self.indent + text)
+            depth = self.indent if self.max_indent == 0 else min(self.indent, self.max_indent)
+            self.lines.append("\t" * depth + text)
         else:
             self.lines.append("")
 
@@ -75,14 +78,39 @@ class VMapWriter:
         self.indent += 1
         self._array_items = []
         self._in_array = True
+        self._array_dtype = dtype
 
     def _end_array(self):
         # Flush buffered items with commas between them
-        for i, item in enumerate(self._array_items):
-            if i < len(self._array_items) - 1:
-                self._w(item + ",")
+        items = self._array_items
+        if self.max_indent and len(items) > 8:
+            # Compact mode: write multiple values per line to reduce file size
+            depth = min(self.indent, self.max_indent)
+            prefix = "\t" * depth
+            # Determine values per line based on array data type
+            dt = self._array_dtype
+            if 'vector4' in dt:
+                per_line = 4
+            elif 'vector3' in dt:
+                per_line = 5
+            elif 'vector2' in dt:
+                per_line = 8
             else:
-                self._w(item)
+                per_line = 16
+
+            for start in range(0, len(items), per_line):
+                chunk = items[start:start + per_line]
+                line_parts = []
+                for idx, item in enumerate(chunk):
+                    is_last = (start + idx == len(items) - 1)
+                    line_parts.append(item + ("" if is_last else ","))
+                self.lines.append(prefix + " ".join(line_parts))
+        else:
+            for i, item in enumerate(items):
+                if i < len(items) - 1:
+                    self._w(item + ",")
+                else:
+                    self._w(item)
         self._array_items = []
         self._in_array = False
         self.indent -= 1
@@ -404,7 +432,7 @@ class VMapWriter:
         self._prop("fademindist", "float", "-1")
         self._prop("fademaxdist", "float", "0")
         self._prop("disableHeightDisplacement", "bool", "0")
-        self._prop("smoothingAngle", "float", str(DEFAULT_SMOOTHING_ANGLE))
+        self._prop("smoothingAngle", "float", f"{DEFAULT_SMOOTHING_ANGLE:g}")
         self._prop("tintColor", "color", "255 255 255 255")
         self._prop("renderAmt", "int", "255")
         self._prop("physicsType", "string", physics_type)
@@ -509,7 +537,7 @@ class VMapWriter:
         self._prop("id", "elementid", _uid())
         self._prop("classname", "string", "trigger_multiple")
         self._prop("vscripts", "string", "")
-        self._prop("targetname", "string", "slime_bounce")
+        self._prop("targetname", "string", "")
         self._prop("parentname", "string", "")
         self._prop("parentAttachmentName", "string", "")
         self._prop("useLocalOffset", "string", "0")
@@ -1059,7 +1087,8 @@ def write_vmap_file(filepath: str, meshes: list[HalfEdgeMesh],
                     mesh_physics_types: list[str] = None,
                     mesh_disable_shadows: list[bool] = None,
                     script_path: str = None,
-                    light_sources: list[tuple] = None):
+                    light_sources: list[tuple] = None,
+                    max_indent: int = 0):
     """Write a .vmap file to disk.
 
     Args:
@@ -1073,8 +1102,10 @@ def write_vmap_file(filepath: str, meshes: list[HalfEdgeMesh],
         mesh_disable_shadows: Optional list of bools per mesh (True = no shadows)
         script_path: Optional script path for point_script entity
         light_sources: Optional list of (x, y, z, block_name) for light entities
+        max_indent: Maximum indentation depth (0 = unlimited). Lower values
+                    reduce file size by capping tab indentation.
     """
-    writer = VMapWriter()
+    writer = VMapWriter(max_indent=max_indent)
     content = writer.write_vmap(meshes, materials, material_map, scale=scale,
                                 entity_meshes=entity_meshes,
                                 mesh_physics_types=mesh_physics_types,

@@ -15,8 +15,9 @@ from parsers.nbt_parser import parse_nbt
 from parsers.schematic_parser import parse_schematic
 from parsers.schem_parser import parse_schem
 from converter.mesh_generator import (generate_quads, group_quads_by_material,
-                                       group_quads_by_block_pos, group_quads_merge_connected)
-from converter.halfedge import build_halfedge_mesh
+                                       group_quads_by_block_pos, group_quads_merge_connected,
+                                       group_quads_by_chunk)
+from converter.accel import build_halfedge_mesh, RUST_AVAILABLE
 from vmap.writer import write_vmap_file
 from config.blocks import is_model_block, is_non_solid_model, is_noshadow_mesh
 from textures.pack_reader import TexturePackReader
@@ -368,13 +369,21 @@ class MCtoCSApp(ctk.CTk):
         # Output mode
         ctk.CTkLabel(settings_frame, text="Output Mode:").grid(
             row=2, column=0, padx=(15, 5), pady=(5, 12), sticky="w")
-        self._output_mode_var = ctk.StringVar(value="Per Block")
+        self._output_mode_var = ctk.StringVar(value="Per Chunk")
         self._output_mode = ctk.CTkOptionMenu(
             settings_frame,
-            values=["Per Block", "Merge Same Touching", "Per Block Type", "Single Mesh"],
+            values=["Per Block", "Per Chunk", "Merge Same Touching", "Per Block Type", "Single Mesh"],
             variable=self._output_mode_var,
         )
         self._output_mode.grid(row=2, column=1, padx=5, pady=(5, 12), sticky="w")
+
+        # Compact output (reduced indentation)
+        ctk.CTkLabel(settings_frame, text="Compact Output:").grid(
+            row=2, column=2, padx=(20, 5), pady=(5, 12), sticky="w")
+        self._compact_output_var = ctk.BooleanVar(value=True)
+        ctk.CTkSwitch(settings_frame, text="Smaller files", variable=self._compact_output_var,
+                      onvalue=True, offvalue=False).grid(
+            row=2, column=3, padx=(5, 15), pady=(5, 12), sticky="w")
 
         # Offset
         offset_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
@@ -736,13 +745,15 @@ class MCtoCSApp(ctk.CTk):
                     f"{grid.block_count} solid blocks | "
                     f"{len(grid.get_unique_block_types())} block types")
             self._info_label.configure(text=info, text_color="#2ecc71")
-            if grid.block_count > 5000 and self._output_mode_var.get() == "Per Block":
+            if grid.block_count > 500 and self._output_mode_var.get() == "Per Block":
                 messagebox.showwarning(
                     "Large Structure",
                     f"This structure has {grid.block_count:,} solid blocks.\n\n"
-                    "For structures over 5,000 blocks it is strongly recommended "
-                    "to use the \"Merge Same Touching\" output mode for better "
-                    "performance and smaller file size."
+                    "\"Per Block\" mode creates one mesh per block, resulting in "
+                    "very large files. Consider using:\n"
+                    "• \"Per Chunk\" — groups by 16×16 regions (recommended)\n"
+                    "• \"Merge Same Touching\" — merges connected blocks\n"
+                    "• \"Single Mesh\" — smallest file size"
                 )
         except Exception as e:
             self._info_label.configure(text=f"Error: {e}", text_color="#e74c3c")
@@ -1108,6 +1119,10 @@ class MCtoCSApp(ctk.CTk):
             # Step 1: Parse input
             self._set_step("Step 1/7: Parsing input file")
             self._log("Step 1/7: Parsing input file...")
+            if RUST_AVAILABLE:
+                self._log("  Rust acceleration: ENABLED")
+            else:
+                self._log("  Rust acceleration: not available (using pure Python)")
             self._set_progress(0.05, "Parsing...")
             self._set_stat("memory", self._mem_mb())
             grid = self._parse_input_file(self._input_path)
@@ -1258,6 +1273,11 @@ class MCtoCSApp(ctk.CTk):
                 quad_groups = list(groups.values())
                 del groups
                 self._log(f"Split into {len(quad_groups)} per-block meshes")
+            elif output_mode == "Per Chunk":
+                groups = group_quads_by_chunk(quads, scale * 16)
+                quad_groups = list(groups.values())
+                del groups
+                self._log(f"Split into {len(quad_groups)} chunk-based meshes")
             elif output_mode == "Merge Same Touching":
                 quad_groups = group_quads_merge_connected(quads)
                 self._log(f"Merged into {len(quad_groups)} connected groups")
@@ -1482,8 +1502,12 @@ class MCtoCSApp(ctk.CTk):
                             mesh_physics_types=mesh_physics_types,
                             mesh_disable_shadows=mesh_disable_shadows,
                             script_path=script_path,
-                            light_sources=light_sources if light_sources else None)
-            self._log(f"VMap written: {output_vmap}")
+                            light_sources=light_sources if light_sources else None,
+                            max_indent=3 if self._compact_output_var.get() else 0)
+            file_size_mb = os.path.getsize(output_vmap) / (1024 * 1024)
+            self._log(f"VMap written: {output_vmap} ({file_size_mb:.2f} MB)")
+            if self._compact_output_var.get():
+                self._log("  Compact output enabled (reduced indentation + inline arrays)")
             if entity_mesh_pairs:
                 self._log(f"  Included {len(entity_mesh_pairs)} entity meshes")
             if light_sources:

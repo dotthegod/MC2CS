@@ -361,9 +361,22 @@ class ModelBlockQuadGenerator:
                 x1, y1, z1 = from_pos
                 x2, y2, z2 = to_pos
 
+                # Detect flat-plane elements (zero thickness in one axis).
+                # Cross-pattern models (flowers, grass) use two of these rotated
+                # ±45°, each with 2 opposite faces.  Keep only the first face
+                # per plane — the material already enables render_backfaces.
+                is_flat_plane = (x1 == x2 or y1 == y2 or z1 == z2) and rotation is not None
+                flat_face_emitted = False
+
                 for mc_face, face_data in faces.items():
                     if mc_face not in _ELEMENT_FACE_VERTS:
                         continue
+
+                    # For flat-plane elements, skip the second face (backface rendered by material)
+                    if is_flat_plane:
+                        if flat_face_emitted:
+                            continue
+                        flat_face_emitted = True
 
                     # Check cullface: if this face should be culled by adjacent solid blocks
                     # Rotate the cullface direction by the blockstate model rotation
