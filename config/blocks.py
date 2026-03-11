@@ -130,6 +130,7 @@ TRANSPARENT_BLOCKS = frozenset({
 # Non-solid blocks (no geometry, treated like air for face culling)
 # These are truly invisible or decorative blocks that produce no mesh at all
 NON_SOLID_BLOCKS = frozenset({
+    "minecraft:barrier",
     "minecraft:redstone_wire",
     "minecraft:repeater", "minecraft:comparator",
     "minecraft:string",
@@ -702,6 +703,13 @@ def is_translucent(block_name: str) -> bool:
     return base in TRANSPARENT_BLOCKS
 
 
+# Blocks that are inherently waterlogged (always submerged, no waterlogged=true property)
+INHERENTLY_WATERLOGGED = frozenset({
+    "minecraft:kelp", "minecraft:kelp_plant",
+    "minecraft:seagrass", "minecraft:tall_seagrass",
+    "minecraft:bubble_column",
+})
+
 # Liquid blocks that may be wrapped as entities (func_water / trigger_hurt)
 LIQUID_BLOCKS = frozenset({
     "minecraft:water",
@@ -716,7 +724,10 @@ def is_liquid(block_name: str) -> bool:
 
 
 def is_waterlogged(block_name: str) -> bool:
-    """Check if a block state has waterlogged=true."""
+    """Check if a block state has waterlogged=true or is inherently waterlogged."""
+    base = block_name.split("[")[0] if "[" in block_name else block_name
+    if base in INHERENTLY_WATERLOGGED:
+        return True
     if "[" not in block_name:
         return False
     props = block_name.split("[")[1].rstrip("]")
@@ -808,6 +819,12 @@ def is_slime_block(block_name: str) -> bool:
     """Check if block is a slime block (should bounce players)."""
     base = block_name.split("[")[0] if "[" in block_name else block_name
     return base in SLIME_BLOCKS
+
+
+def is_barrier_block(block_name: str) -> bool:
+    """Check if block is a barrier (invisible solid clip brush)."""
+    base = block_name.split("[")[0] if "[" in block_name else block_name
+    return base == "minecraft:barrier"
 
 
 # Model blocks that are physically non-solid (pass-through, no collision).
